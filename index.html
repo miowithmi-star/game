@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>ПИКСЕЛЬ ТАНК</title>
+  <title>Собери танка</title>
   <link rel="stylesheet" href="style.css">
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 </head>
 <body>
 
 <div id="game" class="scanlines">
-  <h1>ПИКСЕЛЬ ТАНК</h1>
+  <h1>СОБЕРИ ТАНКА</h1>
   <div id="text">ВЫБЕРИ МОНСТРА И ПРЕВРАТИ В ТАНК</div>
   
   <div id="choose">
@@ -29,9 +29,11 @@
   <div id="battle" class="hidden">
     <div id="stats-player"></div>
     <div id="stats-enemy"></div>
-    <div id="text-battle"></div>
-    <button onclick="playerAttack('normal')">⚔️ УДАР</button>
-    <button onclick="playerAttack('strong')">💥 МОЩНЫЙ УДАР</button>
+    <div id="battle-area">
+      <div id="tap-zone" onclick="playerTap()">ТАП ТАП ТАП!<br>БЕЙ ЦВЕТОК!</div>
+      <div id="damage-flash" class="hidden">💥</div>
+    </div>
+    <div id="text-battle">Жми по экрану чтобы атаковать!</div>
   </div>
 
   <div id="end" class="hidden">
@@ -41,10 +43,11 @@
 </div>
 
 <script>
-// JavaScript полностью здесь (без изменений)
 let player = { name: "", hp: 0, atk: 0, speed: 0 };
 let upgradeCount = 0;
 let enemy = { hp: 0, atk: 0 };
+let isPlayerTurn = true;
+let enemyAttackTimer;
 
 function start(monster) {
   player.name = monster + "-ТАНК";
@@ -110,53 +113,73 @@ function startBattle() {
   document.getElementById("upgrades").classList.add("hidden");
   document.getElementById("battle").classList.remove("hidden");
 
-  enemy.hp = Math.floor(Math.random() * 71) + 90;
-  enemy.atk = Math.floor(Math.random() * 26) + 18;
+  enemy.hp = Math.floor(Math.random() * 81) + 100; // 100–180
+  enemy.atk = Math.floor(Math.random() * 31) + 20; // 20–50
 
-  document.getElementById("stats-player").innerHTML = 
-    `ТВОЙ ТАНК ❤️ ${player.hp}`;
-  document.getElementById("stats-enemy").innerHTML = 
-    `ЗЛОЙ ЦВЕТОК 🌸 ${enemy.hp} HP`;
+  document.getElementById("stats-player").innerHTML = `ТВОЙ ТАНК ❤️ ${player.hp}`;
+  document.getElementById("stats-enemy").innerHTML = `ЗЛОЙ ЦВЕТОК 🌸 ${enemy.hp} HP`;
 
-  document.getElementById("text-battle").innerHTML = 
-    "🌸 ПОЯВИЛСЯ ЗЛОЙ ЦВЕТОК!<br>ТВОЙ ХОД, ТАНК!";
+  document.getElementById("text-battle").innerHTML = "Жми по экрану чтобы атаковать!<br>Цветок тоже не спит...";
+
+  // Враг начинает атаковать через случайное время
+  scheduleEnemyAttack();
 }
 
-function playerAttack(type) {
-  let dmg = type === "normal" 
-    ? Math.floor(Math.random() * 11) + player.atk - 5 
-    : Math.floor(Math.random() * 21) + player.atk + 5;
+function scheduleEnemyAttack() {
+  const delay = Math.random() * 600 + 1200; // 1.2–1.8 сек
+  enemyAttackTimer = setTimeout(enemyAttack, delay);
+}
 
-  dmg = Math.max(5, dmg);
-  enemy.hp -= dmg;
+function enemyAttack() {
+  if (player.hp <= 0) return;
 
-  document.getElementById("text-battle").innerHTML = 
-    `💥 УДАР! -${dmg} HP<br>У ЦВЕТКА 🌸 ${Math.max(0, enemy.hp)}`;
+  let dmg = Math.floor(Math.random() * 11) + enemy.atk - 5;
+  dmg = Math.max(8, dmg);
+  player.hp -= dmg;
 
-  document.getElementById("stats-enemy").innerHTML = 
-    `ЗЛОЙ ЦВЕТОК 🌸 ${Math.max(0, enemy.hp)} HP`;
+  document.getElementById("stats-player").innerHTML = `ТВОЙ ТАНК ❤️ ${Math.max(0, player.hp)}`;
+  document.getElementById("text-battle").innerHTML = `🌸 ЦВЕТОК БЬЁТ! -${dmg} HP<br>ТАП ТАП ТАП — БЕЙ ОТВЕТНО!`;
 
-  if (enemy.hp <= 0) {
-    endGame(true);
+  // Анимация получения урона
+  document.getElementById("game").classList.add("shake");
+  setTimeout(() => document.getElementById("game").classList.remove("shake"), 400);
+
+  if (player.hp <= 0) {
+    endGame(false);
     return;
   }
 
-  setTimeout(() => {
-    let enemyDmg = Math.floor(Math.random() * 11) + enemy.atk - 5;
-    enemyDmg = Math.max(3, enemyDmg);
-    player.hp -= enemyDmg;
+  scheduleEnemyAttack();
+}
 
-    document.getElementById("text-battle").innerHTML += 
-      `<br>🌸 ЦВЕТОК АТАКУЕТ! -${enemyDmg} HP`;
+function playerTap() {
+  if (player.hp <= 0 || enemy.hp <= 0) return;
 
-    document.getElementById("stats-player").innerHTML = 
-      `ТВОЙ ТАНК ❤️ ${Math.max(0, player.hp)}`;
+  let dmg = Math.floor(Math.random() * 13) + player.atk - 6; // чуть шире разброс
+  dmg = Math.max(6, dmg);
+  enemy.hp -= dmg;
 
-    if (player.hp <= 0) endGame(false);
-  }, 900);
+  document.getElementById("stats-enemy").innerHTML = `ЗЛОЙ ЦВЕТОК 🌸 ${Math.max(0, enemy.hp)} HP`;
+
+  // Визуальный удар
+  const flash = document.getElementById("damage-flash");
+  flash.textContent = `-${dmg} 💥`;
+  flash.classList.remove("hidden");
+  flash.style.color = dmg > player.atk * 1.3 ? "#ff0" : "#0f0";
+  setTimeout(() => flash.classList.add("hidden"), 600);
+
+  // Тряска врага (через stats-enemy)
+  document.getElementById("stats-enemy").classList.add("hit");
+  setTimeout(() => document.getElementById("stats-enemy").classList.remove("hit"), 300);
+
+  if (enemy.hp <= 0) {
+    clearTimeout(enemyAttackTimer);
+    endGame(true);
+  }
 }
 
 function endGame(win) {
+  clearTimeout(enemyAttackTimer);
   document.getElementById("battle").classList.add("hidden");
   const endDiv = document.getElementById("end");
   endDiv.classList.remove("hidden");
