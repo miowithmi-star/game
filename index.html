@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ПИКСЕЛЬ ТАНК</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div id="game" class="scanlines">
+  <h1>ПИКСЕЛЬ ТАНК</h1>
+  <div id="text">ВЫБЕРИ МОНСТРА И ПРЕВРАТИ В ТАНК</div>
+  
+  <div id="choose">
+    <button onclick="start('Крыса')">🐀 КРЫСА</button>
+    <button onclick="start('Слайм')">🟢 СЛАЙМ</button>
+    <button onclick="start('Голем')">🪨 ГОЛЕМ</button>
+  </div>
+
+  <div id="upgrades" class="hidden">
+    <div id="stats"></div>
+    <div id="text-upgrade"></div>
+    <button id="btn1" onclick="upgrade(1)"></button>
+    <button id="btn2" onclick="upgrade(2)"></button>
+  </div>
+
+  <div id="battle" class="hidden">
+    <div id="stats-player"></div>
+    <div id="stats-enemy"></div>
+    <div id="text-battle"></div>
+    <button onclick="playerAttack('normal')">⚔️ УДАР</button>
+    <button onclick="playerAttack('strong')">💥 МОЩНЫЙ УДАР</button>
+  </div>
+
+  <div id="end" class="hidden">
+    <div id="result"></div>
+    <button onclick="location.reload()">ЕЩЁ РАЗ</button>
+  </div>
+</div>
+
+<script>
+// JavaScript полностью здесь (без изменений)
+let player = { name: "", hp: 0, atk: 0, speed: 0 };
+let upgradeCount = 0;
+let enemy = { hp: 0, atk: 0 };
+
+function start(monster) {
+  player.name = monster + "-ТАНК";
+
+  if (monster === "Крыса") { player.hp = 60; player.atk = 25; player.speed = 40; }
+  else if (monster === "Слайм") { player.hp = 90; player.atk = 15; player.speed = 10; }
+  else { player.hp = 120; player.atk = 20; player.speed = 15; }
+
+  document.getElementById("choose").classList.add("hidden");
+  document.getElementById("upgrades").classList.remove("hidden");
+  showStats();
+  nextUpgrade();
+}
+
+function showStats() {
+  document.getElementById("stats").innerHTML = 
+    `📊 ${player.name}<br>❤️ ${player.hp} | ⚔️ ${player.atk} | 🏃 ${player.speed}`;
+}
+
+function nextUpgrade() {
+  upgradeCount++;
+  if (upgradeCount > 3) {
+    startBattle();
+    return;
+  }
+
+  const titles = ["ЗЕЛЬЕ КОРПУСА", "ЗЕЛЬЕ ОРУЖИЯ", "ЗЕЛЬЕ ДВИЖЕНИЯ"];
+  document.getElementById("text-upgrade").innerHTML = 
+    `🧪 АПГРЕЙД #\( {upgradeCount}<br><b> \){titles[upgradeCount-1]}</b>`;
+
+  let opt1, opt2;
+  if (upgradeCount === 1) {
+    opt1 = "Лёгкое (+20 HP +5 ⚔️)";
+    opt2 = "Тяжёлое (+50 HP -10 🏃)";
+  } else if (upgradeCount === 2) {
+    opt1 = "Быстрое (+15 ⚔️)";
+    opt2 = "Мощное (+30 ⚔️ -10 🏃)";
+  } else {
+    opt1 = "Скоростное (+20 🏃)";
+    opt2 = "Броневое (+30 HP)";
+  }
+
+  document.getElementById("btn1").innerHTML = `1. 🧪 ${opt1}`;
+  document.getElementById("btn2").innerHTML = `2. 🧪 ${opt2}`;
+}
+
+function upgrade(choice) {
+  if (upgradeCount === 1) {
+    if (choice === 1) { player.hp += 20; player.atk += 5; }
+    else { player.hp += 50; player.speed = Math.max(5, player.speed - 10); }
+  } else if (upgradeCount === 2) {
+    if (choice === 1) { player.atk += 15; }
+    else { player.atk += 30; player.speed = Math.max(5, player.speed - 10); }
+  } else {
+    if (choice === 1) { player.speed += 20; }
+    else { player.hp += 30; }
+  }
+  showStats();
+  nextUpgrade();
+}
+
+function startBattle() {
+  document.getElementById("upgrades").classList.add("hidden");
+  document.getElementById("battle").classList.remove("hidden");
+
+  enemy.hp = Math.floor(Math.random() * 71) + 90;
+  enemy.atk = Math.floor(Math.random() * 26) + 18;
+
+  document.getElementById("stats-player").innerHTML = 
+    `ТВОЙ ТАНК ❤️ ${player.hp}`;
+  document.getElementById("stats-enemy").innerHTML = 
+    `ЗЛОЙ ЦВЕТОК 🌸 ${enemy.hp} HP`;
+
+  document.getElementById("text-battle").innerHTML = 
+    "🌸 ПОЯВИЛСЯ ЗЛОЙ ЦВЕТОК!<br>ТВОЙ ХОД, ТАНК!";
+}
+
+function playerAttack(type) {
+  let dmg = type === "normal" 
+    ? Math.floor(Math.random() * 11) + player.atk - 5 
+    : Math.floor(Math.random() * 21) + player.atk + 5;
+
+  dmg = Math.max(5, dmg);
+  enemy.hp -= dmg;
+
+  document.getElementById("text-battle").innerHTML = 
+    `💥 УДАР! -${dmg} HP<br>У ЦВЕТКА 🌸 ${Math.max(0, enemy.hp)}`;
+
+  document.getElementById("stats-enemy").innerHTML = 
+    `ЗЛОЙ ЦВЕТОК 🌸 ${Math.max(0, enemy.hp)} HP`;
+
+  if (enemy.hp <= 0) {
+    endGame(true);
+    return;
+  }
+
+  setTimeout(() => {
+    let enemyDmg = Math.floor(Math.random() * 11) + enemy.atk - 5;
+    enemyDmg = Math.max(3, enemyDmg);
+    player.hp -= enemyDmg;
+
+    document.getElementById("text-battle").innerHTML += 
+      `<br>🌸 ЦВЕТОК АТАКУЕТ! -${enemyDmg} HP`;
+
+    document.getElementById("stats-player").innerHTML = 
+      `ТВОЙ ТАНК ❤️ ${Math.max(0, player.hp)}`;
+
+    if (player.hp <= 0) endGame(false);
+  }, 900);
+}
+
+function endGame(win) {
+  document.getElementById("battle").classList.add("hidden");
+  const endDiv = document.getElementById("end");
+  endDiv.classList.remove("hidden");
+
+  if (win) {
+    document.getElementById("result").innerHTML = `
+      <div style="font-size:48px;margin:20px 0;">🎉 ПОБЕДА! 🎉</div>
+      <div id="crown">👑</div>
+      <div style="color:#ffd700;font-size:22px;margin:20px 0;">ТЫ — КОРОЛЬ ТАНКОВ!</div>
+    `;
+  } else {
+    document.getElementById("result").innerHTML = `
+      💥 ТАНК УНИЧТОЖЕН...<br>
+      ЦВЕТОК ПОБЕДИЛ 😢
+    `;
+  }
+}
+</script>
+</body>
+</html>
