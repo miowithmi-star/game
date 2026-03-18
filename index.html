@@ -10,73 +10,304 @@
 <body>
 
 <div id="game" class="scanlines">
-  <h1>СОБЕРИ ТАНКА</h1>
-  <div id="text">ВЫБЕРИ МОНСТРА И ПРЕВРАТИ В ТАНК</div>
+  <h1>СОБЕРИ ТАНКА — PvP</h1>
+  <div id="text">Выберите монстра для PvP-битвы!</div>
   
   <div id="choose">
-    <button onclick="start('Крыса')">🐀 КРЫСА</button>
-    <button onclick="start('Слайм')">🟢 СЛАЙМ</button>
-    <button onclick="start('Голем')">🪨 ГОЛЕМ</button>
+    <button onclick="start(1, 'Крыса')">🐀 КРЫСА (P1)</button>
+    <button onclick="start(2, 'Слайм')">🟢 СЛАЙМ (P2)</button>
+    <button onclick="start(1, 'Голем')">🪨 ГОЛЕМ (P1)</button>
+    <button onclick="start(2, 'Голем')">🪨 ГОЛЕМ (P2)</button>
+    <button onclick="start(2, 'Крыса')">🐀 КРЫСА (P2)</button>
+    <button onclick="start(1, 'Слайм')">🟢 СЛАЙМ (P1)</button>
+  </div>
+
+  <div id="feed-phase" class="hidden">
+    <div id="feed-text">P<span id="feed-player">1</span> — корми <span id="feed-monster"></span>!</div>
+    <canvas id="feed-canvas" width="320" height="320"></canvas>
+    <div id="feed-score">Съедено: 0 | ❤️+0 | ⚔️+0 | 🏃+0</div>
+    <button onclick="endFeedPhase()">Закончить кормление</button>
   </div>
 
   <div id="upgrades" class="hidden">
-    <div id="stats"></div>
-    <div id="text-upgrade"></div>
+    <div class="player-area">
+      <div id="player1-stats" class="stats"></div>
+      <div id="player1-character" class="character"></div>
+    </div>
+    <div class="player-area">
+      <div id="player2-stats" class="stats"></div>
+      <div id="player2-character" class="character"></div>
+    </div>
+    <div id="text-upgrade">ЗЕЛЬЕ ДЛЯ <span id="current-player">P1</span></div>
     <button id="btn1" onclick="upgrade(1)"></button>
     <button id="btn2" onclick="upgrade(2)"></button>
   </div>
 
   <div id="battle" class="hidden">
-    <div id="stats-player"></div>
-    <div id="stats-enemy"></div>
-    <div id="battle-area">
-      <div id="tap-zone" onclick="playerTap()">ТАП ТАП ТАП!<br>БЕЙ ЦВЕТОК!</div>
-      <div id="damage-flash" class="hidden">💥</div>
+    <div class="arena">
+      <div id="player1-tank" class="tank" onclick="tap(1)">
+        <div id="p1-dmg" class="dmg-flash"></div>
+      </div>
+      <div id="vs">VS</div>
+      <div id="player2-tank" class="tank" onclick="tap(2)">
+        <div id="p2-dmg" class="dmg-flash"></div>
+      </div>
     </div>
-    <div id="text-battle">Жми по экрану чтобы атаковать!</div>
+    <div id="text-battle">Очередь P1 — тапай по своему танку!</div>
+    <div id="stats-battle">
+      <span id="hp1">❤️ P1: 100</span> | <span id="hp2">P2: 100 ❤️</span>
+    </div>
   </div>
 
   <div id="end" class="hidden">
     <div id="result"></div>
-    <button onclick="location.reload()">ЕЩЁ РАЗ</button>
+    <button onclick="location.reload()">НОВАЯ БИТВА</button>
   </div>
 </div>
 
 <script>
-let player = { name: "", hp: 0, atk: 0, speed: 0 };
+const players = [
+  null,
+  {id:1, name:"", hp:0, atk:0, speed:0, size:1, upgrades:[], color:"#aaff00"},
+  {id:2, name:"", hp:0, atk:0, speed:0, size:1, upgrades:[], color:"#00ccff"}
+];
+
+let currentPlayer = 1;
 let upgradeCount = 0;
-let enemy = { hp: 0, atk: 0 };
-let isPlayerTurn = true;
-let enemyAttackTimer;
+let gamePhase = "choose";
 
-function start(monster) {
-  player.name = monster + "-ТАНК";
+// ─── ЗМЕЙКА ──────────────────────────────────────────────────────
+let feedPhaseActive = false;
+let feedPlayer = 1;
+let currentMonsterType = "rat";
+let feedSnake = [];
+let feedDirection = {x:1, y:0};
+let feedFoods = [];
+let feedCollected = {hp:0, atk:0, speed:0, count:0};
+const BOX = 16;
+const GRID = 20;
 
-  if (monster === "Крыса") { player.hp = 60; player.atk = 25; player.speed = 40; }
-  else if (monster === "Слайм") { player.hp = 90; player.atk = 15; player.speed = 10; }
-  else { player.hp = 120; player.atk = 20; player.speed = 15; }
+const canvas = document.getElementById("feed-canvas");
+const ctx = canvas ? canvas.getContext("2d") : null;
 
-  document.getElementById("choose").classList.add("hidden");
-  document.getElementById("upgrades").classList.remove("hidden");
-  showStats();
-  nextUpgrade();
+// Рисование головы
+function drawHead(c, type, px, py, box, dir) {
+  const hx = px * box + box/2;
+  const hy = py * box + box/2;
+  const r = box / 2 - 1;
+  c.save();
+  c.translate(hx, hy);
+
+  let angle = 0;
+  if (dir.x === 1) angle = 0;
+  else if (dir.x === -1) angle = Math.PI;
+  else if (dir.y === -1) angle = -Math.PI/2;
+  else if (dir.y === 1) angle = Math.PI/2;
+  c.rotate(angle);
+
+  if (type === "rat") {
+    c.fillStyle = "#aaff55"; c.beginPath(); c.ellipse(0,0,r*1.1,r*0.8,0,0,Math.PI*2); c.fill();
+    c.fillStyle = "#88cc44"; c.beginPath(); c.arc(-r*0.6,-r*0.5,r*0.4,0,Math.PI*2); c.arc(r*0.6,-r*0.5,r*0.4,0,Math.PI*2); c.fill();
+    c.fillStyle = "#000"; c.beginPath(); c.arc(-r*0.3,-r*0.2,r*0.15,0,Math.PI*2); c.arc(r*0.3,-r*0.2,r*0.15,0,Math.PI*2); c.fill();
+    c.fillStyle = "#ff88aa"; c.beginPath(); c.arc(0,r*0.4,r*0.18,0,Math.PI*2); c.fill();
+  } else if (type === "slime") {
+    c.fillStyle = players[feedPlayer].color || "#00ccff"; c.beginPath(); c.arc(0,0,r*1.05,0,Math.PI*2); c.fill();
+    c.fillStyle = "rgba(255,255,255,0.6)"; c.beginPath(); c.arc(-r*0.4,-r*0.5,r*0.35,0,Math.PI*2); c.fill();
+    c.fillStyle = "#000"; c.beginPath(); c.arc(-r*0.35,-r*0.25,r*0.18,0,Math.PI*2); c.arc(r*0.35,-r*0.25,r*0.18,0,Math.PI*2); c.fill();
+    c.strokeStyle = "#000"; c.lineWidth = 2; c.beginPath(); c.arc(0,r*0.3,r*0.5,0.4,Math.PI-0.4); c.stroke();
+  } else { // golem
+    c.fillStyle = "#777799"; c.fillRect(-r*0.9,-r*0.9,r*1.8,r*1.8);
+    c.strokeStyle = "#444466"; c.lineWidth = 1.5; c.beginPath();
+    c.moveTo(-r*0.7,-r*0.3); c.lineTo(r*0.4,r*0.6);
+    c.moveTo(r*0.2,-r*0.8); c.lineTo(-r*0.5,r*0.4); c.stroke();
+    c.fillStyle = "#88ffff"; c.beginPath(); c.arc(-r*0.4,-r*0.3,r*0.22,0,Math.PI*2); c.arc(r*0.4,-r*0.3,r*0.22,0,Math.PI*2); c.fill();
+    c.fillStyle = "#004488"; c.beginPath(); c.arc(-r*0.4,-r*0.3,r*0.12,0,Math.PI*2); c.arc(r*0.4,-r*0.3,r*0.12,0,Math.PI*2); c.fill();
+  }
+  c.restore();
 }
 
-function showStats() {
-  document.getElementById("stats").innerHTML = 
-    `📊 ${player.name}<br>❤️ ${player.hp} | ⚔️ ${player.atk} | 🏃 ${player.speed}`;
+// Рисование сегмента тела
+function drawBodySegment(c, type, px, py, box, isTail = false) {
+  const sx = px * box, sy = py * box;
+  if (type === "rat") {
+    c.fillStyle = "#99dd44"; c.fillRect(sx+2, sy+2, box-4, box-4);
+    if (isTail) {
+      c.strokeStyle = "#88cc33"; c.lineWidth = 3;
+      c.beginPath(); c.moveTo(sx+box/2, sy+box/2); c.lineTo(sx+box/2-12, sy+box/2); c.stroke();
+    }
+  } else if (type === "slime") {
+    c.fillStyle = players[feedPlayer].color || "#00aaff"; c.globalAlpha = 0.85;
+    c.fillRect(sx+1, sy+1, box-2, box-2); c.globalAlpha = 1;
+    c.fillStyle = players[feedPlayer].color || "#00ccff";
+    c.beginPath(); c.arc(sx+box*0.3, sy+box*0.7, box*0.12, 0, Math.PI*2); c.fill();
+  } else {
+    c.fillStyle = "#666688"; c.fillRect(sx+1, sy+1, box-2, box-2);
+    c.strokeStyle = "#8888aa"; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(sx+3, sy+3); c.lineTo(sx+box-3, sy+box-3); c.stroke();
+  }
 }
 
+function start(playerId, monster) {
+  const p = players[playerId];
+  p.name = monster + "-ТАНК";
+
+  if (monster === "Крыса")      { p.hp = 60; p.atk = 25; p.speed = 40; p.color = "#aaff00"; }
+  else if (monster === "Слайм") { p.hp = 90; p.atk = 15; p.speed = 10; p.color = "#00ccff"; }
+  else                          { p.hp = 120; p.atk = 20; p.speed = 15; p.color = "#8888ff"; }
+
+  updateStats(playerId);
+  updateCharacter(playerId);
+
+  if (players[1].name && players[2].name) {
+    document.getElementById("choose").classList.add("hidden");
+    document.getElementById("feed-phase").classList.remove("hidden");
+    startFeedingForPlayer(1);
+  }
+}
+
+function updateStats(pid) {
+  const p = players[pid];
+  document.getElementById(`player${pid}-stats`).innerHTML = 
+    `${p.name}<br>❤️ ${Math.round(p.hp)} | ⚔️ ${p.atk} | 🏃 ${p.speed}`;
+}
+
+function updateCharacter(pid) {
+  const p = players[pid];
+  let char = p.name.includes("Крыса") ? "🐀" : p.name.includes("Слайм") ? "🟢" : "🪨";
+  char = char.repeat(Math.max(1, Math.floor(p.size * 1.5)));
+  const el = document.getElementById(`player${pid}-character`);
+  el.innerHTML = char;
+  el.style.transform = `scale(${1 + (p.size-1)*0.3})`;
+  el.style.color = p.color;
+}
+
+function startFeedingForPlayer(pid) {
+  feedPlayer = pid;
+  currentMonsterType = players[pid].name.includes("Крыса") ? "rat" :
+                       players[pid].name.includes("Слайм") ? "slime" : "golem";
+
+  feedSnake = [{x:10, y:10}];
+  feedDirection = {x:1, y:0};
+  feedFoods = [];
+  feedCollected = {hp:0, atk:0, speed:0, count:0};
+  feedPhaseActive = true;
+
+  document.getElementById("feed-player").textContent = pid;
+  document.getElementById("feed-monster").textContent = players[pid].name.replace("-ТАНК","");
+
+  spawnFood(); spawnFood();
+  feedLoop();
+}
+
+function spawnFood() {
+  let x, y;
+  do {
+    x = Math.floor(Math.random() * GRID);
+    y = Math.floor(Math.random() * GRID);
+  } while (feedSnake.some(s => s.x === x && s.y === y));
+
+  const t = Math.random();
+  let color = "#0f0";
+  if (t < 0.33) color = "#f44";
+  else if (t < 0.66) color = "#48f";
+
+  feedFoods.push({x, y, color});
+}
+
+function feedLoop() {
+  if (!feedPhaseActive || !ctx) return;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  feedFoods.forEach(f => {
+    ctx.fillStyle = f.color;
+    ctx.fillRect(f.x * BOX, f.y * BOX, BOX, BOX);
+  });
+
+  let head = {x: feedSnake[0].x + feedDirection.x, y: feedSnake[0].y + feedDirection.y};
+  head.x = (head.x + GRID) % GRID;
+  head.y = (head.y + GRID) % GRID;
+
+  feedSnake.unshift(head);
+
+  let ate = false;
+  for (let i = 0; i < feedFoods.length; i++) {
+    if (head.x === feedFoods[i].x && head.y === feedFoods[i].y) {
+      ate = true;
+      const f = feedFoods.splice(i, 1)[0];
+      feedCollected.count++;
+      if (f.color === "#0f0") feedCollected.hp += 12;
+      else if (f.color === "#f44") feedCollected.atk += 6;
+      else feedCollected.speed += 8;
+      spawnFood();
+      break;
+    }
+  }
+  if (!ate) feedSnake.pop();
+
+  feedSnake.forEach((s, i) => {
+    if (i === 0) {
+      drawHead(ctx, currentMonsterType, s.x, s.y, BOX, feedDirection);
+    } else {
+      drawBodySegment(ctx, currentMonsterType, s.x, s.y, BOX, i === feedSnake.length - 1);
+    }
+  });
+
+  document.getElementById("feed-score").innerHTML = 
+    `Съедено: \( {feedCollected.count} | ❤️+ \){feedCollected.hp} | ⚔️+\( {feedCollected.atk} | 🏃+ \){feedCollected.speed}`;
+
+  if (feedCollected.count >= 12) {
+    endFeedPhase();
+  } else {
+    setTimeout(feedLoop, Math.max(60, 220 - feedCollected.speed * 1.8));
+  }
+}
+
+window.addEventListener("keydown", e => {
+  if (!feedPhaseActive) return;
+  switch (e.key.toLowerCase()) {
+    case "arrowup": case "w":    if (feedDirection.y === 0) feedDirection = {x:0,y:-1}; break;
+    case "arrowdown": case "s":  if (feedDirection.y === 0) feedDirection = {x:0,y:1}; break;
+    case "arrowleft": case "a":  if (feedDirection.x === 0) feedDirection = {x:-1,y:0}; break;
+    case "arrowright": case "d": if (feedDirection.x === 0) feedDirection = {x:1,y:0}; break;
+  }
+});
+
+function endFeedPhase() {
+  feedPhaseActive = false;
+  const p = players[feedPlayer];
+  p.hp += feedCollected.hp;
+  p.atk += feedCollected.atk;
+  p.speed += feedCollected.speed;
+  p.size += feedCollected.count * 0.08;
+
+  updateStats(feedPlayer);
+  updateCharacter(feedPlayer);
+
+  if (feedPlayer === 1) {
+    startFeedingForPlayer(2);
+  } else {
+    document.getElementById("feed-phase").classList.add("hidden");
+    document.getElementById("upgrades").classList.remove("hidden");
+    currentPlayer = 1;
+    upgradeCount = 0;
+    nextUpgrade();
+  }
+}
+
+// ─── АПГРЕЙДЫ ─────────────────────────────────────────────────────
 function nextUpgrade() {
   upgradeCount++;
   if (upgradeCount > 3) {
-    startBattle();
+    document.getElementById("upgrades").classList.add("hidden");
+    document.getElementById("battle").classList.remove("hidden");
+    updateBattleStats();
+    document.getElementById("text-battle").textContent = "Очередь P1 — тапай по своему танку!";
     return;
   }
 
-  const titles = ["ЗЕЛЬЕ КОРПУСА", "ЗЕЛЬЕ ОРУЖИЯ", "ЗЕЛЬЕ ДВИЖЕНИЯ"];
   document.getElementById("text-upgrade").innerHTML = 
-    `🧪 АПГРЕЙД #\( {upgradeCount}<br><b> \){titles[upgradeCount-1]}</b>`;
+    `🧪 АПГРЕЙД #${upgradeCount} ДЛЯ \( {players[currentPlayer].name} ( \){currentPlayer === 1 ? 'P1' : 'P2'})`;
 
   let opt1, opt2;
   if (upgradeCount === 1) {
@@ -90,113 +321,72 @@ function nextUpgrade() {
     opt2 = "Броневое (+30 HP)";
   }
 
-  document.getElementById("btn1").innerHTML = `1. 🧪 ${opt1}`;
-  document.getElementById("btn2").innerHTML = `2. 🧪 ${opt2}`;
+  document.getElementById("btn1").textContent = `1. ${opt1}`;
+  document.getElementById("btn2").textContent = `2. ${opt2}`;
 }
 
 function upgrade(choice) {
+  const p = players[currentPlayer];
   if (upgradeCount === 1) {
-    if (choice === 1) { player.hp += 20; player.atk += 5; }
-    else { player.hp += 50; player.speed = Math.max(5, player.speed - 10); }
+    if (choice === 1) { p.hp += 20; p.atk += 5; p.size += 0.3; }
+    else { p.hp += 50; p.speed = Math.max(5, p.speed - 10); p.size += 0.6; }
   } else if (upgradeCount === 2) {
-    if (choice === 1) { player.atk += 15; }
-    else { player.atk += 30; player.speed = Math.max(5, player.speed - 10); }
+    if (choice === 1) p.atk += 15;
+    else { p.atk += 30; p.speed = Math.max(5, p.speed - 10); }
   } else {
-    if (choice === 1) { player.speed += 20; }
-    else { player.hp += 30; }
+    if (choice === 1) p.speed += 20;
+    else p.hp += 30;
   }
-  showStats();
+  updateStats(currentPlayer);
+  updateCharacter(currentPlayer);
+  currentPlayer = currentPlayer === 1 ? 2 : 1;
   nextUpgrade();
 }
 
-function startBattle() {
-  document.getElementById("upgrades").classList.add("hidden");
-  document.getElementById("battle").classList.remove("hidden");
-
-  enemy.hp = Math.floor(Math.random() * 81) + 100; // 100–180
-  enemy.atk = Math.floor(Math.random() * 31) + 20; // 20–50
-
-  document.getElementById("stats-player").innerHTML = `ТВОЙ ТАНК ❤️ ${player.hp}`;
-  document.getElementById("stats-enemy").innerHTML = `ЗЛОЙ ЦВЕТОК 🌸 ${enemy.hp} HP`;
-
-  document.getElementById("text-battle").innerHTML = "Жми по экрану чтобы атаковать!<br>Цветок тоже не спит...";
-
-  // Враг начинает атаковать через случайное время
-  scheduleEnemyAttack();
+// ─── БОЙ ──────────────────────────────────────────────────────────
+function updateBattleStats() {
+  document.getElementById("hp1").textContent = `❤️ P1: ${Math.max(0, players[1].hp)}`;
+  document.getElementById("hp2").textContent = `P2: ${Math.max(0, players[2].hp)} ❤️`;
 }
 
-function scheduleEnemyAttack() {
-  const delay = Math.random() * 600 + 1200; // 1.2–1.8 сек
-  enemyAttackTimer = setTimeout(enemyAttack, delay);
-}
+function tap(playerId) {
+  if (playerId !== currentPlayer) return;
 
-function enemyAttack() {
-  if (player.hp <= 0) return;
+  const atk = players[playerId];
+  const defId = playerId === 1 ? 2 : 1;
+  const def = players[defId];
 
-  let dmg = Math.floor(Math.random() * 11) + enemy.atk - 5;
-  dmg = Math.max(8, dmg);
-  player.hp -= dmg;
+  if (atk.hp <= 0 || def.hp <= 0) return;
 
-  document.getElementById("stats-player").innerHTML = `ТВОЙ ТАНК ❤️ ${Math.max(0, player.hp)}`;
-  document.getElementById("text-battle").innerHTML = `🌸 ЦВЕТОК БЬЁТ! -${dmg} HP<br>ТАП ТАП ТАП — БЕЙ ОТВЕТНО!`;
+  let dmg = Math.floor(Math.random() * 13) + atk.atk - 6;
+  dmg = Math.max(6, dmg);
+  def.hp -= dmg;
 
-  // Анимация получения урона
-  document.getElementById("game").classList.add("shake");
-  setTimeout(() => document.getElementById("game").classList.remove("shake"), 400);
+  const flash = document.getElementById(`p${defId}-dmg`);
+  flash.textContent = `-${dmg}`;
+  flash.classList.remove("hidden");
+  flash.style.color = dmg > atk.atk * 1.3 ? "#ff4444" : "#ffff00";
+  setTimeout(() => flash.classList.add("hidden"), 800);
 
-  if (player.hp <= 0) {
-    endGame(false);
+  document.getElementById(`player${defId}-tank`).classList.add("hit");
+  setTimeout(() => document.getElementById(`player${defId}-tank`).classList.remove("hit"), 400);
+
+  updateBattleStats();
+
+  if (def.hp <= 0) {
+    document.getElementById("battle").classList.add("hidden");
+    document.getElementById("end").classList.remove("hidden");
+    document.getElementById("result").innerHTML = `
+      <div style="font-size:48px; margin:20px 0;">🎉 ПОБЕДА P${playerId}! 🎉</div>
+      <div style="font-size:140px;">👑</div>
+      <div style="color:#ffd700; font-size:28px;">${players[playerId].name} — КОРОЛЬ!</div>
+    `;
     return;
   }
 
-  scheduleEnemyAttack();
-}
-
-function playerTap() {
-  if (player.hp <= 0 || enemy.hp <= 0) return;
-
-  let dmg = Math.floor(Math.random() * 13) + player.atk - 6; // чуть шире разброс
-  dmg = Math.max(6, dmg);
-  enemy.hp -= dmg;
-
-  document.getElementById("stats-enemy").innerHTML = `ЗЛОЙ ЦВЕТОК 🌸 ${Math.max(0, enemy.hp)} HP`;
-
-  // Визуальный удар
-  const flash = document.getElementById("damage-flash");
-  flash.textContent = `-${dmg} 💥`;
-  flash.classList.remove("hidden");
-  flash.style.color = dmg > player.atk * 1.3 ? "#ff0" : "#0f0";
-  setTimeout(() => flash.classList.add("hidden"), 600);
-
-  // Тряска врага (через stats-enemy)
-  document.getElementById("stats-enemy").classList.add("hit");
-  setTimeout(() => document.getElementById("stats-enemy").classList.remove("hit"), 300);
-
-  if (enemy.hp <= 0) {
-    clearTimeout(enemyAttackTimer);
-    endGame(true);
-  }
-}
-
-function endGame(win) {
-  clearTimeout(enemyAttackTimer);
-  document.getElementById("battle").classList.add("hidden");
-  const endDiv = document.getElementById("end");
-  endDiv.classList.remove("hidden");
-
-  if (win) {
-    document.getElementById("result").innerHTML = `
-      <div style="font-size:48px;margin:20px 0;">🎉 ПОБЕДА! 🎉</div>
-      <div id="crown">👑</div>
-      <div style="color:#ffd700;font-size:22px;margin:20px 0;">ТЫ — КОРОЛЬ ТАНКОВ!</div>
-    `;
-  } else {
-    document.getElementById("result").innerHTML = `
-      💥 ТАНК УНИЧТОЖЕН...<br>
-      ЦВЕТОК ПОБЕДИЛ 😢
-    `;
-  }
+  currentPlayer = defId;
+  document.getElementById("text-battle").textContent = `Очередь P${currentPlayer} — тапай!`;
 }
 </script>
 </body>
-</html>
+  </html>
