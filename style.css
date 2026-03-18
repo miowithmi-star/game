@@ -13,10 +13,9 @@ body {
   margin: 40px auto;
   background: #1a0033;
   border: 8px solid #ff00ff;
-  box-shadow: 
-    0 0 0 8px #00ff41, 
-    0 0 30px #ff00ff;
+  box-shadow: 0 0 0 8px #00ff41, 0 0 30px #ff00ff;
   padding: 20px;
+  position: relative;
 }
 
 h1 {
@@ -69,9 +68,7 @@ button:active {
   color: #ffff00;
 }
 
-.hidden {
-  display: none;
-}
+.hidden { display: none; }
 
 #crown {
   font-size: 120px;
@@ -85,7 +82,77 @@ button:active {
   to   { transform: scale(1.1) rotate(8deg); }
 }
 
-/* CRT-эффект (scanlines) */
+/* Новая зона тапа */
+#battle-area {
+  margin: 20px 0;
+  text-align: center;
+}
+
+#tap-zone {
+  font-size: 22px;
+  background: #330066;
+  border: 6px dashed #ff00ff;
+  padding: 40px 20px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s;
+}
+
+#tap-zone:active {
+  transform: scale(0.96);
+  background: #5500aa;
+}
+
+#damage-flash {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 60px;
+  font-weight: bold;
+  color: #ff0;
+  pointer-events: none;
+  animation: flash 0.6s ease-out;
+}
+
+@keyframes flash {
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(0.5); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.4); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.8); }
+}
+
+/* Анимации ударов */
+.hit {
+  animation: hitAnim 0.3s ease;
+}
+
+@keyframes hitAnim {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-8px); }
+  50% { transform: translateX(8px); }
+  75% { transform: translateX(-4px); }
+  100% { transform: translateX(0); }
+}
+
+.shake {
+  animation: shake 0.4s ease;
+}
+
+@keyframes shake {
+  0% { transform: translate(1px, 1px) rotate(0deg); }
+  10% { transform: translate(-1px, -2px) rotate(-1deg); }
+  20% { transform: translate(-3px, 0px) rotate(1deg); }
+  30% { transform: translate(3px, 2px) rotate(0deg); }
+  40% { transform: translate(1px, -1px) rotate(-1deg); }
+  50% { transform: translate(-1px, 2px) rotate(1deg); }
+  60% { transform: translate(-3px, 1px) rotate(0deg); }
+  70% { transform: translate(3px, 1px) rotate(-1deg); }
+  80% { transform: translate(-1px, -1px) rotate(1deg); }
+  90% { transform: translate(1px, 2px) rotate(0deg); }
+  100% { transform: translate(1px, -2px) rotate(-1deg); }
+}
+
+/* CRT-эффект */
 .scanlines::after {
   content: '';
   position: absolute;
